@@ -10,6 +10,10 @@ func TestIterateRefList(t *testing.T) {
 
 	f, err := os.Open(filename)
 	if err != nil {
+		if os.IsNotExist(err) {
+			t.Skip(err)
+			return
+		}
 		t.Fatal(err)
 	}
 	defer f.Close()

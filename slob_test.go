@@ -12,6 +12,10 @@ func TestFromReader(t *testing.T) {
 
 	f, err := os.Open(filename)
 	if err != nil {
+		if os.IsNotExist(err) {
+			t.Skip(err)
+			return
+		}
 		t.Fatal(err)
 	}
 	defer f.Close()
@@ -23,25 +27,26 @@ func TestFromReader(t *testing.T) {
 }
 
 func FuzzFromReader(f *testing.F) {
-	{
+	seed := func() {
 		filename := "freedict-eng-nld-0.1.1.slob"
 		file, err := os.Open(filename)
 		if err != nil {
-			f.Fatal(err)
+			return
 		}
 		defer file.Close()
 		data, err := ioutil.ReadAll(file)
 		if err != nil {
-			f.Fatal(err)
+			return
 		}
 		f.Add(data, 0, 0)
 	}
+	seed()
 
 	f.Fuzz(func(t *testing.T, data []byte, binIndex, itemIndex int) {
 		reader := bytes.NewReader(data)
 		slob, err := SlobFromReader(reader)
 		if err == nil {
-			slob.Get(binIndex, itemIndex)
+			_, _ = slob.Get(binIndex, itemIndex)
 		}
 	})
 }
