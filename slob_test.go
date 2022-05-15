@@ -34,11 +34,14 @@ func FuzzFromReader(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
-		f.Add(data)
+		f.Add(data, 0, 0)
 	}
 
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(t *testing.T, data []byte, binIndex, itemIndex int) {
 		reader := bytes.NewReader(data)
-		_, _ = SlobFromReader(reader)
+		slob, err := SlobFromReader(reader)
+		if err == nil {
+			slob.Get(binIndex, itemIndex)
+		}
 	})
 }
