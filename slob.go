@@ -141,6 +141,12 @@ func (s *Slob) Keys() (<-chan *Ref, <-chan error) {
 }
 
 func (s *Slob) Get(binIndex, itemIndex int) (*Item, error) {
+	if binIndex < 0 {
+		return nil, fmt.Errorf("Invalid binIndex: %d", binIndex)
+	}
+	if itemIndex < 0 {
+		return nil, fmt.Errorf("Invalid itemIndex: %d", itemIndex)
+	}
 	return s.store.Get(uint32(binIndex), uint16(itemIndex))
 }
 
