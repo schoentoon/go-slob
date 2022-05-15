@@ -24,7 +24,7 @@ func TestStoreGetBlob(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = blob.Get(0)
+	_, err = blob.get(0)
 	if err != nil {
 		t.Fatal(err)
 	}

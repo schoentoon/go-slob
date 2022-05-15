@@ -10,17 +10,17 @@ import (
 
 type Slob struct {
 	reader        io.ReadSeeker
-	uuid          uuid.UUID
+	Uuid          uuid.UUID
 	encoding      string
-	tags          map[string]string
-	content_types []string
+	Tags          map[string]string
+	Content_types []string
 
 	blob_count   uint32
 	store_offset int64
 	size         int64
 
-	ref_list *RefList
-	store    *Store
+	ref_list *ref_list
+	store    *store
 }
 
 type itemListInfo struct {
@@ -60,7 +60,7 @@ func SlobFromReader(f io.ReadSeeker) (*Slob, error) {
 	if n != 16 {
 		return nil, fmt.Errorf("Input too short")
 	}
-	err = out.uuid.UnmarshalBinary(uuidbuf)
+	err = out.Uuid.UnmarshalBinary(uuidbuf)
 	if err != nil {
 		return nil, err
 	}
@@ -136,12 +136,20 @@ func SlobFromReader(f io.ReadSeeker) (*Slob, error) {
 	return out, nil
 }
 
+func (s *Slob) Keys() (<-chan *Ref, <-chan error) {
+	return s.ref_list.Iterate()
+}
+
+func (s *Slob) Get(binIndex, itemIndex int) (*Item, error) {
+	return s.store.Get(uint32(binIndex), uint16(itemIndex))
+}
+
 func (s *Slob) read_tags() error {
 	count, err := read_byte(s.reader)
 	if err != nil {
 		return err
 	}
-	s.tags = make(map[string]string, count)
+	s.Tags = make(map[string]string, count)
 
 	for i := 0; uint8(i) < count; i++ {
 		key, err := read_tiny_text(s.reader)
@@ -152,7 +160,7 @@ func (s *Slob) read_tags() error {
 		if err != nil {
 			return err
 		}
-		s.tags[key] = value
+		s.Tags[key] = value
 	}
 
 	return nil
@@ -163,14 +171,14 @@ func (s *Slob) read_content_types() error {
 	if err != nil {
 		return err
 	}
-	s.content_types = make([]string, 0, count)
+	s.Content_types = make([]string, 0, count)
 
 	for i := 0; uint8(i) < count; i++ {
 		content, err := read_text(s.reader)
 		if err != nil {
 			return err
 		}
-		s.content_types = append(s.content_types, content)
+		s.Content_types = append(s.Content_types, content)
 	}
 
 	return nil
@@ -204,8 +212,8 @@ func (s *Slob) read_item_list_info(offset int64) (*itemListInfo, error) {
 	}, nil
 }
 
-func (s *Slob) init_reflist(refListInfo *itemListInfo) (*RefList, error) {
-	out := &RefList{
+func (s *Slob) init_reflist(refListInfo *itemListInfo) (*ref_list, error) {
+	out := &ref_list{
 		slob: s,
 		info: refListInfo,
 	}
@@ -213,17 +221,17 @@ func (s *Slob) init_reflist(refListInfo *itemListInfo) (*RefList, error) {
 	return out, nil
 }
 
-func (s *Slob) init_store(compression string, storeInfo *itemListInfo) (*Store, error) {
+func (s *Slob) init_store(compression string, storeInfo *itemListInfo) (*store, error) {
 	decompressor, err := get_decompressor(compression)
 	if err != nil {
 		return nil, err
 	}
 
-	out := &Store{
+	out := &store{
 		slob:          s,
 		info:          storeInfo,
 		decompressor:  decompressor,
-		content_types: s.content_types,
+		content_types: s.Content_types,
 	}
 
 	return out, nil

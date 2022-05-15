@@ -7,19 +7,25 @@ import (
 const POS_SIZE = 8
 const REF_SIZE = 8
 
-type RefList struct {
+type ref_list struct {
 	slob *Slob
 	info *itemListInfo
 }
 
 type Ref struct {
-	Key       string
+	Key string
+
+	slob      *Slob
 	binIndex  uint32
 	itemIndex uint16
 	fragment  string
 }
 
-func (r *RefList) Get(i int) (*Ref, error) {
+func (r *Ref) Get() (*Item, error) {
+	return r.slob.store.GetRef(r)
+}
+
+func (r *ref_list) Get(i int) (*Ref, error) {
 	pos, err := r.readPointer(i)
 	if err != nil {
 		return nil, err
@@ -27,7 +33,7 @@ func (r *RefList) Get(i int) (*Ref, error) {
 	return r.readItem(r.info.dataOffset + int64(pos))
 }
 
-func (r *RefList) readPointer(i int) (int64, error) {
+func (r *ref_list) readPointer(i int) (int64, error) {
 	pos := r.info.posOffset + int64(i*POS_SIZE)
 
 	_, err := r.slob.reader.Seek(pos, io.SeekStart)
@@ -38,7 +44,7 @@ func (r *RefList) readPointer(i int) (int64, error) {
 	return read_long(r.slob.reader)
 }
 
-func (r *RefList) readItem(pos int64) (*Ref, error) {
+func (r *ref_list) readItem(pos int64) (*Ref, error) {
 	_, err := r.slob.reader.Seek(pos, io.SeekStart)
 	if err != nil {
 		return nil, err
@@ -66,17 +72,18 @@ func (r *RefList) readItem(pos int64) (*Ref, error) {
 
 	return &Ref{
 		Key:       key,
+		slob:      r.slob,
 		binIndex:  binIndex,
 		itemIndex: itemIndex,
 		fragment:  fragment,
 	}, nil
 }
 
-func (r *RefList) Size() uint32 {
+func (r *ref_list) Size() uint32 {
 	return r.info.count
 }
 
-func (r *RefList) Iterate() (<-chan *Ref, <-chan error) {
+func (r *ref_list) Iterate() (<-chan *Ref, <-chan error) {
 	ch := make(chan *Ref)
 	errCh := make(chan error)
 
