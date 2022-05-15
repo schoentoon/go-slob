@@ -32,7 +32,7 @@ func (b *blob) readPointer(i uint16) (uint32, error) {
 }
 
 func (b *blob) get(itemIndex uint16) (*Item, error) {
-	if int(itemIndex) > len(b.content_types) {
+	if int(itemIndex) >= len(b.content_types) {
 		return nil, fmt.Errorf("blob doesn't contain item with index: %d", itemIndex)
 	}
 

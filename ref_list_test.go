@@ -34,7 +34,7 @@ func TestIterateRefList(t *testing.T) {
 			} else {
 				return
 			}
-		case _ = <-ch:
+		case <-ch:
 		}
 	}
 }
