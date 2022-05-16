@@ -7,28 +7,8 @@ import (
 	"testing"
 )
 
-func TestFromReader(t *testing.T) {
-	filename := "freedict-eng-nld-0.1.1.slob"
-
-	f, err := os.Open(filename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			t.Skip(err)
-			return
-		}
-		t.Fatal(err)
-	}
-	defer f.Close()
-
-	_, err = SlobFromReader(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func FuzzFromReader(f *testing.F) {
-	seed := func() {
-		filename := "freedict-eng-nld-0.1.1.slob"
+	seed := func(filename string) {
 		file, err := os.Open(filename)
 		if err != nil {
 			return
@@ -40,7 +20,8 @@ func FuzzFromReader(f *testing.F) {
 		}
 		f.Add(data, 0, 0)
 	}
-	seed()
+	seed("testdata/lzma2.slob")
+	seed("testdata/zlib.slob")
 
 	f.Fuzz(func(t *testing.T, data []byte, binIndex, itemIndex int) {
 		reader := bytes.NewReader(data)
