@@ -13,12 +13,12 @@ type ref_list struct {
 }
 
 type Ref struct {
-	Key string
+	Key       string
+	BinIndex  uint32
+	ItemIndex uint16
 
-	slob      *Slob
-	binIndex  uint32
-	itemIndex uint16
-	fragment  string
+	slob     *Slob
+	fragment string
 }
 
 func (r *Ref) Get() (*Item, error) {
@@ -72,9 +72,9 @@ func (r *ref_list) readItem(pos int64) (*Ref, error) {
 
 	return &Ref{
 		Key:       key,
+		BinIndex:  binIndex,
+		ItemIndex: itemIndex,
 		slob:      r.slob,
-		binIndex:  binIndex,
-		itemIndex: itemIndex,
 		fragment:  fragment,
 	}, nil
 }

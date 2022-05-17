@@ -18,7 +18,7 @@ type Item struct {
 }
 
 func (s *store) GetRef(ref *Ref) (*Item, error) {
-	return s.Get(ref.binIndex, ref.itemIndex)
+	return s.Get(ref.BinIndex, ref.ItemIndex)
 }
 
 func (s *store) Get(binIndex uint32, itemIndex uint16) (*Item, error) {
