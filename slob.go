@@ -150,6 +150,10 @@ func (s *Slob) Get(binIndex, itemIndex int) (*Item, error) {
 	return s.store.Get(uint32(binIndex), uint16(itemIndex))
 }
 
+func (s *Slob) Size() uint32 {
+	return s.store.Size()
+}
+
 func (s *Slob) read_tags() error {
 	count, err := read_byte(s.reader)
 	if err != nil {
