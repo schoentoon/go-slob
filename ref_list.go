@@ -1,6 +1,7 @@
 package goslob
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -77,6 +78,30 @@ func (r *ref_list) readItem(pos int64) (*Ref, error) {
 		slob:      r.slob,
 		fragment:  fragment,
 	}, nil
+}
+
+func (r *ref_list) Find(key string) (*Ref, error) {
+	size := int(r.Size())
+	for i := 0; i < size; i++ {
+		pos, err := r.readPointer(i)
+		if err != nil {
+			return nil, err
+		}
+		_, err = r.slob.reader.Seek(r.info.dataOffset+int64(pos), io.SeekStart)
+		if err != nil {
+			return nil, err
+		}
+
+		text, err := read_text(r.slob.reader)
+		if err != nil {
+			return nil, err
+		}
+		if key == text {
+			return r.readItem(r.info.dataOffset + int64(pos))
+		}
+	}
+
+	return nil, fmt.Errorf("Unable to find item with key: %s", key)
 }
 
 func (r *ref_list) Size() uint32 {

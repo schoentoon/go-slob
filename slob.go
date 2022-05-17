@@ -154,6 +154,15 @@ func (s *Slob) Size() uint32 {
 	return s.store.Size()
 }
 
+func (s *Slob) Find(key string) (*Item, error) {
+	ref, err := s.ref_list.Find(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return ref.Get()
+}
+
 func (s *Slob) read_tags() error {
 	count, err := read_byte(s.reader)
 	if err != nil {
