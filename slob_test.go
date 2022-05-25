@@ -2,6 +2,7 @@ package goslob
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -65,6 +66,46 @@ func TestSlob(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestConcurrency(t *testing.T) {
+	f, err := os.Open("testdata/zlib.slob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	slob, err := SlobFromReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	iterations := 10
+	errCh := make(chan error)
+
+	for i := 0; i < iterations; i++ {
+		go func(goroutine int) {
+			item, err := slob.Find("earth")
+			if err != nil {
+				errCh <- fmt.Errorf("Error in goroutine %d: %s", goroutine, err)
+				return
+			}
+
+			if string(item.Content) != "Hello, Earth!" {
+				errCh <- fmt.Errorf("Error in goroutine %d: Content not the same", goroutine)
+				return
+			}
+
+			errCh <- nil
+		}(i)
+	}
+
+	for i := 0; i < iterations; i++ {
+		err := <-errCh
+		if err != nil {
+			t.Error(err)
+		}
 	}
 }
 
