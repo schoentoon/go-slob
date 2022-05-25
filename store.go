@@ -38,12 +38,7 @@ func (s *store) Get(binIndex uint32, itemIndex uint16) (*Item, error) {
 func (s *store) readPointer(i uint32) (int64, error) {
 	pos := s.info.posOffset + int64(i*POS_SIZE)
 
-	_, err := s.slob.reader.Seek(pos, io.SeekStart)
-	if err != nil {
-		return 0, err
-	}
-
-	return read_long(s.slob.reader)
+	return read_long(s.slob.reader, pos)
 }
 
 func (s *store) getBlob(binIndex uint32) (*blob, error) {
@@ -55,34 +50,34 @@ func (s *store) getBlob(binIndex uint32) (*blob, error) {
 }
 
 func (s *store) readBlob(pos int64) (*blob, error) {
-	_, err := s.slob.reader.Seek(pos, io.SeekStart)
+	binCount, err := read_int(s.slob.reader, pos)
 	if err != nil {
 		return nil, err
 	}
 
-	binCount, err := read_int(s.slob.reader)
-	if err != nil {
-		return nil, err
-	}
+	pos += 4
 
 	content_types := make([]uint8, 0, binCount)
 	for i := 0; i < int(binCount); i++ {
-		typ, err := read_byte(s.slob.reader)
+		typ, err := read_byte(s.slob.reader, pos)
 		if err != nil {
 			return nil, err
 		}
 		content_types = append(content_types, typ)
+		pos++
 	}
 
-	compressed_len, err := read_int(s.slob.reader)
+	compressed_len, err := read_int(s.slob.reader, pos)
 	if err != nil {
 		return nil, err
 	}
 
-	limitedReader := io.LimitReader(s.slob.reader, int64(compressed_len))
+	pos += 4
+
+	reader := io.NewSectionReader(s.slob.reader, pos, int64(compressed_len))
 	buf := bytes.Buffer{}
 
-	err = s.decompressor.Decompress(limitedReader, &buf)
+	err = s.decompressor.Decompress(reader, &buf)
 	if err != nil {
 		return nil, err
 	}

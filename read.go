@@ -7,81 +7,94 @@ import (
 	"unicode/utf8"
 )
 
-func read_byte(r io.Reader) (uint8, error) {
-	var out uint8
+func read_byte(r io.ReaderAt, pos int64) (uint8, error) {
+	buf := make([]byte, 1)
 
-	err := binary.Read(r, binary.BigEndian, &out)
-
-	return out, err
-}
-
-func read_short(r io.Reader) (uint16, error) {
-	var out uint16
-
-	err := binary.Read(r, binary.BigEndian, &out)
-
-	return out, err
-}
-
-func read_int(r io.Reader) (uint32, error) {
-	var out uint32
-
-	err := binary.Read(r, binary.BigEndian, &out)
-
-	return out, err
-}
-
-func read_long(r io.Reader) (int64, error) {
-	var out int64
-
-	err := binary.Read(r, binary.BigEndian, &out)
-
-	return out, err
-}
-
-func read_byte_string(r io.Reader) ([]byte, error) {
-	len, err := read_byte(r)
+	_, err := r.ReadAt(buf, pos)
 	if err != nil {
-		return nil, err
+		return 0, err
+	}
+
+	return buf[0], nil
+}
+
+func read_short(r io.ReaderAt, pos int64) (uint16, error) {
+	buf := make([]byte, 2)
+
+	_, err := r.ReadAt(buf, pos)
+	if err != nil {
+		return 0, err
+	}
+
+	return binary.BigEndian.Uint16(buf), nil
+}
+
+func read_int(r io.ReaderAt, pos int64) (uint32, error) {
+	buf := make([]byte, 4)
+
+	_, err := r.ReadAt(buf, pos)
+	if err != nil {
+		return 0, err
+	}
+
+	return binary.BigEndian.Uint32(buf), nil
+}
+
+func read_long(r io.ReaderAt, pos int64) (int64, error) {
+	buf := make([]byte, 8)
+
+	_, err := r.ReadAt(buf, pos)
+	if err != nil {
+		return 0, err
+	}
+
+	return int64(binary.BigEndian.Uint64(buf)), nil
+}
+
+func read_byte_string(r io.ReaderAt, pos int64) (int, []byte, error) {
+	len, err := read_byte(r, pos)
+	if err != nil {
+		return 1, nil, err
 	}
 
 	buf := make([]byte, len)
-	_, err = r.Read(buf)
+	n, err := r.ReadAt(buf, pos+1)
 	if err != nil {
-		return nil, err
+		return n + 1, nil, err
 	}
 
-	return buf, nil
+	// the + 1 is from read_byte
+	return n + 1, buf, nil
 }
 
-func read_tiny_text(r io.Reader) (string, error) {
-	buf, err := read_byte_string(r)
+func read_tiny_text(r io.ReaderAt, pos int64) (int, string, error) {
+	n, buf, err := read_byte_string(r, pos)
 	if err != nil {
-		return "", err
+		return n, "", err
 	}
 
 	if !utf8.Valid(buf) {
-		return "", fmt.Errorf("Invalid utf-8")
+		return n, "", fmt.Errorf("Invalid utf-8")
 	}
 
-	return string(buf), nil
+	return n, string(buf), nil
 }
 
-func read_text(r io.Reader) (string, error) {
-	len, err := read_short(r)
+func read_text(r io.ReaderAt, pos int64) (int, string, error) {
+	len, err := read_short(r, pos)
 	if err != nil {
-		return "", err
+		return 2, "", err
 	}
 
 	buf := make([]byte, len)
-	_, err = r.Read(buf)
+	n, err := r.ReadAt(buf, pos+2)
 	if err != nil {
-		return "", err
+		return n + 2, "", err
 	}
 
 	if !utf8.Valid(buf) {
-		return "", fmt.Errorf("Invalid utf-8")
+		return n + 2, "", fmt.Errorf("Invalid utf-8")
 	}
 
-	return string(buf), nil
+	return n + 2, string(buf), nil
 }

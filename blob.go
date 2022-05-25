@@ -3,7 +3,6 @@ package goslob
 import (
 	"bytes"
 	"fmt"
-	"io"
 )
 
 type blob struct {
@@ -23,12 +22,7 @@ func newBlob(content_types []uint8, content []byte) (*blob, error) {
 func (b *blob) readPointer(i uint16) (uint32, error) {
 	pos := int64(i * 4)
 
-	_, err := b.content.Seek(pos, io.SeekStart)
-	if err != nil {
-		return 0, err
-	}
-
-	return read_int(b.content)
+	return read_int(b.content, pos)
 }
 
 func (b *blob) get(itemIndex uint16) (*Item, error) {
@@ -40,18 +34,15 @@ func (b *blob) get(itemIndex uint16) (*Item, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	pos := b.data_offset + int64(pointer)
-	_, err = b.content.Seek(pos, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-	len, err := read_int(b.content)
+	len, err := read_int(b.content, pos)
 	if err != nil {
 		return nil, err
 	}
 
 	buf := make([]byte, len)
-	_, err = b.content.Read(buf)
+	_, err = b.content.ReadAt(buf, pos+4)
 	if err != nil {
 		return nil, err
 	}

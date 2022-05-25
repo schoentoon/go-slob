@@ -2,7 +2,6 @@ package goslob
 
 import (
 	"fmt"
-	"io"
 )
 
 const POS_SIZE = 8
@@ -37,36 +36,32 @@ func (r *ref_list) Get(i int) (*Ref, error) {
 func (r *ref_list) readPointer(i int) (int64, error) {
 	pos := r.info.posOffset + int64(i*POS_SIZE)
 
-	_, err := r.slob.reader.Seek(pos, io.SeekStart)
-	if err != nil {
-		return 0, err
-	}
-
-	return read_long(r.slob.reader)
+	return read_long(r.slob.reader, pos)
 }
 
 func (r *ref_list) readItem(pos int64) (*Ref, error) {
-	_, err := r.slob.reader.Seek(pos, io.SeekStart)
+	n, key, err := read_text(r.slob.reader, pos)
 	if err != nil {
 		return nil, err
 	}
 
-	key, err := read_text(r.slob.reader)
+	pos += int64(n)
+
+	binIndex, err := read_int(r.slob.reader, pos)
 	if err != nil {
 		return nil, err
 	}
 
-	binIndex, err := read_int(r.slob.reader)
+	pos += 4
+
+	itemIndex, err := read_short(r.slob.reader, pos)
 	if err != nil {
 		return nil, err
 	}
 
-	itemIndex, err := read_short(r.slob.reader)
-	if err != nil {
-		return nil, err
-	}
+	pos += 2
 
-	fragment, err := read_tiny_text(r.slob.reader)
+	_, fragment, err := read_tiny_text(r.slob.reader, pos)
 	if err != nil {
 		return nil, err
 	}
@@ -87,12 +82,8 @@ func (r *ref_list) Find(key string) (*Ref, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, err = r.slob.reader.Seek(r.info.dataOffset+int64(pos), io.SeekStart)
-		if err != nil {
-			return nil, err
-		}
 
-		text, err := read_text(r.slob.reader)
+		_, text, err := read_text(r.slob.reader, r.info.dataOffset+int64(pos))
 		if err != nil {
 			return nil, err
 		}

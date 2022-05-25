@@ -9,7 +9,7 @@ import (
 )
 
 type Slob struct {
-	reader        io.ReadSeeker
+	reader        io.ReaderAt
 	Uuid          uuid.UUID
 	encoding      string
 	Tags          map[string]string
@@ -32,15 +32,11 @@ type itemListInfo struct {
 var magic = []byte{'!', '-', '1', 'S', 'L', 'O', 'B', 0x1F}
 var valid_compression = []string{"bz2", "zlib", "lzma2"}
 
-func SlobFromReader(f io.ReadSeeker) (*Slob, error) {
-	_, err := f.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-
+func SlobFromReader(f io.ReaderAt) (*Slob, error) {
+	pos := int64(0)
 	magicbuf := make([]byte, len(magic))
 
-	n, err := f.Read(magicbuf)
+	n, err := f.ReadAt(magicbuf, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -52,13 +48,15 @@ func SlobFromReader(f io.ReadSeeker) (*Slob, error) {
 		return nil, fmt.Errorf("No magic match: %#v", magicbuf)
 	}
 
+	pos += int64(n)
+
 	out := &Slob{
 		reader: f,
 	}
 
 	uuidbuf := make([]byte, 16)
 
-	n, err = f.Read(uuidbuf)
+	n, err = f.ReadAt(uuidbuf, pos)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +68,9 @@ func SlobFromReader(f io.ReadSeeker) (*Slob, error) {
 		return nil, err
 	}
 
-	encoding, err := read_byte_string(out.reader)
+	pos += int64(n)
+
+	n, encoding, err := read_byte_string(out.reader, pos)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,9 @@ func SlobFromReader(f io.ReadSeeker) (*Slob, error) {
 		return nil, fmt.Errorf("Invalid encoding: %s", out.encoding)
 	}
 
-	compression, err := read_tiny_text(out.reader)
+	pos += int64(n)
+
+	n, compression, err := read_tiny_text(out.reader, pos)
 	if err != nil {
 		return nil, err
 	}
@@ -93,37 +95,49 @@ func SlobFromReader(f io.ReadSeeker) (*Slob, error) {
 		return nil, fmt.Errorf("Invalid compression: %s", compression)
 	}
 
-	err = out.read_tags()
+	pos += int64(n)
+
+	n, err = out.read_tags(pos)
 	if err != nil {
 		return nil, err
 	}
 
-	err = out.read_content_types()
+	pos += int64(n)
+
+	n, err = out.read_content_types(pos)
 	if err != nil {
 		return nil, err
 	}
 
-	out.blob_count, err = read_int(out.reader)
+	pos += int64(n)
+
+	out.blob_count, err = read_int(out.reader, pos)
 	if err != nil {
 		return nil, err
 	}
 
-	out.store_offset, err = read_long(out.reader)
+	pos += 4
+
+	out.store_offset, err = read_long(out.reader, pos)
 	if err != nil {
 		return nil, err
 	}
 
-	out.size, err = read_long(out.reader)
+	pos += 8
+
+	out.size, err = read_long(out.reader, pos)
 	if err != nil {
 		return nil, err
 	}
 
-	refList, err := out.read_item_list_info(-1)
+	pos += 8
+
+	_, refList, err := out.read_item_list_info(pos)
 	if err != nil {
 		return nil, err
 	}
 
-	storeList, err := out.read_item_list_info(int64(out.store_offset))
+	_, storeList, err := out.read_item_list_info(int64(out.store_offset))
 	if err != nil {
 		return nil, err
 	}
@@ -168,68 +182,66 @@ func (s *Slob) Find(key string) (*Item, error) {
 	return ref.Get()
 }
 
-func (s *Slob) read_tags() error {
-	count, err := read_byte(s.reader)
+func (s *Slob) read_tags(pos int64) (int, error) {
+	count, err := read_byte(s.reader, pos)
 	if err != nil {
-		return err
+		return 1, err
 	}
 	s.Tags = make(map[string]string, count)
 
+	read := 1
+
 	for i := 0; uint8(i) < count; i++ {
-		key, err := read_tiny_text(s.reader)
+		n, key, err := read_tiny_text(s.reader, pos+int64(read))
 		if err != nil {
-			return err
+			return read, err
 		}
-		value, err := read_tiny_text(s.reader)
+
+		read += n
+
+		n, value, err := read_tiny_text(s.reader, pos+int64(read))
 		if err != nil {
-			return err
+			return read, err
 		}
 		s.Tags[key] = value
+
+		read += n
 	}
 
-	return nil
+	return read, nil
 }
 
-func (s *Slob) read_content_types() error {
-	count, err := read_byte(s.reader)
+func (s *Slob) read_content_types(pos int64) (int, error) {
+	count, err := read_byte(s.reader, pos)
 	if err != nil {
-		return err
+		return 1, err
 	}
 	s.Content_types = make([]string, 0, count)
 
+	read := 1
+
 	for i := 0; uint8(i) < count; i++ {
-		content, err := read_text(s.reader)
+		n, content, err := read_text(s.reader, pos+int64(read))
 		if err != nil {
-			return err
+			return read, err
 		}
 		s.Content_types = append(s.Content_types, content)
+
+		read += n
 	}
 
-	return nil
+	return read, nil
 }
 
-func (s *Slob) read_item_list_info(offset int64) (*itemListInfo, error) {
-	if offset < 0 {
-		n, err := s.reader.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return nil, err
-		}
-		offset = n
-	} else {
-		_, err := s.reader.Seek(offset, io.SeekStart)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	count, err := read_int(s.reader)
+func (s *Slob) read_item_list_info(pos int64) (int, *itemListInfo, error) {
+	count, err := read_int(s.reader, pos)
 	if err != nil {
-		return nil, err
+		return 4, nil, err
 	}
 
-	posOffset := int64(offset + 4) // the 4 is the size of the encoded count at the start
+	posOffset := int64(pos + 4) // the 4 is the size of the encoded count at the start
 
-	return &itemListInfo{
+	return 4, &itemListInfo{
 		count:      count,
 		posOffset:  posOffset,
 		dataOffset: int64(uint32(posOffset) + (count * REF_SIZE)),
