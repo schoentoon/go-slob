@@ -109,6 +109,31 @@ func TestConcurrency(t *testing.T) {
 	}
 }
 
+func BenchmarkFromReader(b *testing.B) {
+	f, err := os.Open("testdata/zlib.slob")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer f.Close()
+
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	reader := bytes.NewReader(data)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err = SlobFromReader(reader)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func FuzzFromReader(f *testing.F) {
 	seed := func(filename string) {
 		file, err := os.Open(filename)

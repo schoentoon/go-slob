@@ -33,6 +33,11 @@ var magic = []byte{'!', '-', '1', 'S', 'L', 'O', 'B', 0x1F}
 var valid_compression = []string{"bz2", "zlib", "lzma2"}
 
 func SlobFromReader(f io.ReadSeeker) (*Slob, error) {
+	_, err := f.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+
 	magicbuf := make([]byte, len(magic))
 
 	n, err := f.Read(magicbuf)
